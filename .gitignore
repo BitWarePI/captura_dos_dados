@@ -1,0 +1,10 @@
+# Created by venv; see https://docs.python.org/3/library/venv.html
+
+/virtualAmbiente/
+_pycache_/
+*.pyc
+*.pyo
+*.pyd
+.vscode/
+/Estrutura_dados_Python/
+/lista_exercicios01/
