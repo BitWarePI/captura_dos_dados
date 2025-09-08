@@ -6,5 +6,6 @@ _pycache_/
 *.pyo
 *.pyd
 .vscode/
+.venv
 /Estrutura_dados_Python/
 /lista_exercicios01/
