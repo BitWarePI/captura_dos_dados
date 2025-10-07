@@ -33,7 +33,7 @@ end
 # Unset irrelevant variables.
 deactivate nondestructive
 
-set -gx VIRTUAL_ENV '/home/lukascomka/Área de trabalho/python_script_Sprint1/venv'
+set -gx VIRTUAL_ENV /home/nicolas/sptech/calculo/script-python-bitware/captura_dos_dados/venv
 
 set -gx _OLD_VIRTUAL_PATH $PATH
 set -gx PATH "$VIRTUAL_ENV/"bin $PATH

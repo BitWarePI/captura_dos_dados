@@ -1,6 +1,4 @@
-#!/bin/sh
-'''exec' "/home/lukascomka/Área de trabalho/python_script_Sprint1/venv/bin/python3" "$0" "$@"
-' '''
+#!/home/nicolas/sptech/calculo/script-python-bitware/captura_dos_dados/venv/bin/python3
 # -*- coding: utf-8 -*-
 import re
 import sys
