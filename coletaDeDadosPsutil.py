@@ -7,6 +7,7 @@ import time
 from getmac import get_mac_address
 from datetime import datetime
 import random
+import boto3
 
 system = pf.system();
 while True:
@@ -95,6 +96,10 @@ while True:
     # df_temp = pd.DataFrame(dadosTemp)
     dfProcesso = pd.DataFrame(lista_processos)
 
+    s3 = boto3.resource('s3')
+    for bucket in s3.buckets.all():
+        print(bucket.name)
+
     dfProcesso.to_csv('processos.csv', mode='a', index=False, header=False)
     if(os.path.exists('leituras.csv')):
         #df_temp.to_csv("leituras_temp.csv", mode="a", encoding="utf-8", index=False, sep=";", header=False)
@@ -103,4 +108,10 @@ while True:
         #df_temp.to_csv("leituras_temp.csv", encoding="utf-8", index=False, sep=";")
         df.to_csv("leituras.csv", mode="a", encoding="utf-8", index=False, sep=";")
         firstTime = False
+
+    with open('leituras.csv', 'rb') as data:
+        s3.Bucket('bucket-raw-script-python-bitware').put_object(Key='leituras.csv', Body=data)
+
+    with open('processos.csv', 'rb') as data:
+        s3.Bucket('bucket-raw-script-python-bitware').put_object(Key='processos.csv', Body=data)
     time.sleep(9)
