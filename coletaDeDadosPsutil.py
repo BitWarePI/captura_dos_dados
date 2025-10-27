@@ -12,6 +12,7 @@ import boto3
 system = pf.system();
 while True:
     datetime = dt.datetime.now().replace(microsecond=0)
+    mac = get_mac_address()
 
     cpu = ps.cpu_times(percpu=False)
     mem = ps.virtual_memory()
@@ -75,7 +76,7 @@ while True:
     "disk_percent": [disk.percent],
     "cpu_temperature": [round(temperatura_CPU,2)],
     "gpu_temperature": [round(temperatura_GPU, 2)],
-    "mac_address": [get_mac_address()],
+    "mac_address": [mac],
     }
 
     #dadosMaq["operation_system"].append(system)
@@ -90,7 +91,8 @@ while True:
         'id': processo.info['pid'],
         'processo': processo.info['name'],
         'uso de cpu': f'{processo.info["cpu_percent"]:.2f}',
-        'uso de memoria': f'{processo.info["memory_info"].rss / 1024**2:.2f}'
+        'uso de memoria': f'{processo.info["memory_info"].rss / 1024**2:.2f}',
+        'mac_address': mac
     })
         
     # df_temp = pd.DataFrame(dadosTemp)
