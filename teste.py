@@ -116,4 +116,4 @@ while True:
 
     # with open('processos.csv', 'rb') as data:
     #     s3.Bucket('bucket-raw-script-python-bitware').put_object(Key='processos.csv', Body=data)
-    time.sleep(2)
+    time.sleep(10800)
