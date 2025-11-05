@@ -63,20 +63,20 @@ while True:
     temperatura_CPU = max(30, min(90, temperatura_CPU))
     gpu_percent = cpu_percent + random.uniform(-10, 10)
     gpu_percent = max(0, min(100, gpu_percent))
-    
     temperatura_GPU = 35 + (gpu_percent * 0.55) + random.uniform(-3, 3)
     temperatura_GPU = max(35, min(95, temperatura_GPU))
 
     dadosMaq = {
+    "id_empresa":[1],
     "datetime": [datetime],
-    "operation_system": [system],
+    # "operation_system": [system],
     "cpu_percent": [cpu_percent],
     "gpu_percent": [round(gpu_percent,2)],
-    "ram_percent": [mem.percent],
-    "disk_percent": [disk.percent],
+    #"ram_percent": [mem.percent],
+    #"disk_percent": [disk.percent],
     "cpu_temperature": [round(temperatura_CPU,2)],
     "gpu_temperature": [round(temperatura_GPU, 2)],
-    "mac_address": [mac],
+    "mac_address": [mac]
     }
 
     #dadosMaq["operation_system"].append(system)
@@ -87,11 +87,11 @@ while True:
 
     for processo in processos:
         lista_processos.append({
+        "id_empresa": 1,
         'timestamp': datetime,
-        'id': processo.info['pid'],
         'processo': processo.info['name'],
-        'uso de cpu': f'{processo.info["cpu_percent"]:.2f}',
-        'uso de memoria': f'{processo.info["memory_info"].rss / 1024**2:.2f}',
+        'uso de cpu': cpu_percent,
+        'uso de gpu': round(gpu_percent,2),
         'mac_address': mac
     })
         
@@ -116,4 +116,5 @@ while True:
 
     # with open('processos.csv', 'rb') as data:
     #     s3.Bucket('bucket-raw-script-python-bitware').put_object(Key='processos.csv', Body=data)
-    time.sleep(10800)
+    #time.sleep(10800)
+    time.sleep(2)
