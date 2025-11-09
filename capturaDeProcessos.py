@@ -43,16 +43,19 @@ while True:
     time.sleep(1)
 
     for processo in processos:
-      cpu_proc = processo.cpu_percent(interval=None)
-      lista_processos.append({
+      try:
+        cpu_proc = processo.cpu_percent(interval=None)
+        lista_processos.append({
           'id_empresa': 1,
           'datetime': datetime_atual,
-          'processo': processo.info['name'],
-          'uso de cpu': round(cpu_proc, 2),
+          'processo': processo.name(),
+          'uso_de_cpu': round(cpu_proc, 2),
           'uso de gpu': round(gpu_percent, 2),
           'mac_address': mac
-      })
-        
+        })
+      except (ps.NoSuchProcess, ps.AccessDenied, ps.ZombieProcess):
+        # Ignora processos que sumiram ou não podem ser acessados
+        continue        
 
     dfProcesso = pd.DataFrame(lista_processos)
 
