@@ -59,18 +59,19 @@ while True:
 
     dfProcesso = pd.DataFrame(lista_processos)
 
-    dfProcesso.to_csv('processos'+mac+'.csv', mode='a', index=False, header=True)
+    mac_safe = mac.replace(":", "-")
 
-    if os.path.exists('leituras'+mac+'.csv'):
-        df.to_csv('leituras'+mac+'.csv', mode="a", encoding="utf-8", index=False, sep=";", header=False)
+    dfProcesso.to_csv(f'processos{mac_safe}.csv', mode='a', index=False, header=True)
+
+    if os.path.exists(f'leituras{mac_safe}.csv'):
+        df.to_csv(f'leituras{mac_safe}.csv', mode="a", encoding="utf-8", index=False, sep=";", header=False)
     else:
-        df.to_csv('leituras'+mac+'.csv', mode="a", encoding="utf-8", index=False, sep=";")
+        df.to_csv(f'leituras{mac_safe}.csv', mode="a", encoding="utf-8", index=False, sep=";")
 
-    # Envia para S3 (RAW)
-    with open('leituras'+mac+'.csv', 'rb') as data:
-        s3.Bucket('bucket-raw-script-python-bitware').put_object(Key='dados/leituras'+mac+'.csv', Body=data)
+    with open(f'leituras{mac_safe}.csv', 'rb') as data:
+        s3.Bucket('s3-raw-bitwarepi').put_object(Key=f'dados/leituras{mac_safe}.csv', Body=data)
 
-    with open('processos'+mac+'.csv', 'rb') as data:
-        s3.Bucket('s3-raw-bitwarepi').put_object(Key='dados/processos'+mac+'.csv', Body=data)
+    with open(f'processos{mac_safe}.csv', 'rb') as data:
+        s3.Bucket('s3-raw-bitwarepi').put_object(Key=f'dados/processos{mac_safe}.csv', Body=data)
 
     time.sleep(2)
