@@ -8,8 +8,10 @@ import random
 import boto3
 
 s3 = boto3.resource('s3')
-for bucket in s3.buckets.all():
-    print(bucket.name)
+bucket = s3.Bucket('s3-raw-bitwarepi')
+
+for bucket_item in s3.buckets.all():
+    print(bucket_item.name)
 
 while True:
     datetime_atual = dt.datetime.now().replace(microsecond=0)
@@ -38,40 +40,40 @@ while True:
     df = pd.DataFrame(dadosMaq)
 
     lista_processos = []
-
     processos = list(ps.process_iter(['name', 'cpu_percent']))
     time.sleep(1)
 
     for processo in processos:
-      try:
-        cpu_proc = processo.cpu_percent(interval=None)
-        lista_processos.append({
-          'id_empresa': 1,
-          'datetime': datetime_atual,
-          'processo': processo.name(),
-          'uso_de_cpu': round(cpu_proc, 2),
-          'uso de gpu': round(gpu_percent, 2),
-          'mac_address': mac
-        })
-      except (ps.NoSuchProcess, ps.AccessDenied, ps.ZombieProcess):
-        # Ignora processos que sumiram ou não podem ser acessados
-        continue        
+        try:
+            cpu_proc = processo.cpu_percent(interval=None)
+            lista_processos.append({
+                'id_empresa': 1,
+                'datetime': datetime_atual,
+                'processo': processo.name(),
+                'uso_de_cpu': round(cpu_proc, 2),
+                'uso de gpu': round(gpu_percent, 2),
+                'mac_address': mac
+            })
+        except (ps.NoSuchProcess, ps.AccessDenied, ps.ZombieProcess):
+            continue        
 
     dfProcesso = pd.DataFrame(lista_processos)
 
-    mac_safe = mac.replace(":", "-")
-
-    dfProcesso.to_csv(f'processos{mac_safe}.csv', mode='a', index=False, header=True)
-
-    if os.path.exists(f'leituras{mac_safe}.csv'):
-        df.to_csv(f'leituras{mac_safe}.csv', mode="a", encoding="utf-8", index=False, sep=";", header=False)
+    if os.path.exists('processos.csv'):
+        dfProcesso.to_csv('processos.csv', mode='a', index=False, header=False)
     else:
-        df.to_csv(f'leituras{mac_safe}.csv', mode="a", encoding="utf-8", index=False, sep=";")
+        dfProcesso.to_csv('processos.csv', mode='a', index=False, header=True)
 
-    with open(f'leituras{mac_safe}.csv', 'rb') as data:
-        s3.Bucket('s3-raw-bitwarepi').put_object(Key=f'dados/leituras{mac_safe}.csv', Body=data)
+    if os.path.exists('leituras.csv'):
+        df.to_csv('leituras.csv', mode='a', index=False, sep=';', header=False)
+    else:
+        df.to_csv('leituras.csv', mode='a', index=False, sep=';')
 
-    with open(f'processos{mac_safe}.csv', 'rb') as data:
-        s3.Bucket('s3-raw-bitwarepi').put_object(Key=f'dados/processos{mac_safe}.csv', Body=data)
+    with open('leituras.csv', 'rb') as data:
+        bucket.put_object(Key='dados/leituras.csv', Body=data)
+
+    with open('processos.csv', 'rb') as data:
+        bucket.put_object(Key='dados/processos.csv', Body=data)
 
     time.sleep(2)
+    #time.sleep(10800) #3 horas
