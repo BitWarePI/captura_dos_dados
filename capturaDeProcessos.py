@@ -8,7 +8,7 @@ import random
 import boto3
 
 s3 = boto3.resource('s3')
-bucket = s3.Bucket("s3-raw-bitwarepi")
+bucket = s3.Bucket("s3-raw-bitwarepi777")
 
 try:
     bucket.download_file("dados/leituras.csv", "leituras.csv")
@@ -35,7 +35,6 @@ while True:
     temperatura_GPU = max(35, min(95, temperatura_GPU))
 
     dadosMaq = {
-        "id_empresa": [1],
         "datetime": [datetime_atual],
         "cpu_percent": [round(cpu_percent, 2)],
         "gpu_percent": [round(gpu_percent, 2)],
@@ -54,7 +53,6 @@ while True:
         try:
             cpu_proc = processo.cpu_percent(interval=None)
             lista_processos.append({
-                'id_empresa': 1,
                 'datetime': datetime_atual,
                 'processo': processo.name(),
                 'uso_de_cpu': round(cpu_proc, 2),
@@ -66,9 +64,24 @@ while True:
 
     dfProcesso = pd.DataFrame(lista_processos)
 
-    df.to_csv("leituras.csv", mode="a", index=False, sep=";", header=False)
+    existe_leituras = os.path.exists("leituras.csv") and os.path.getsize("leituras.csv") > 0
+    existe_processos = os.path.exists("processos.csv") and os.path.getsize("processos.csv") > 0
 
-    dfProcesso.to_csv("processos.csv", mode="a", index=False, header=False)
+    df.to_csv(
+        "leituras.csv",
+        mode="a",
+        index=False,
+        sep=";",
+        header=not existe_leituras 
+    )
+
+    dfProcesso.to_csv(
+        "processos.csv",
+        mode="a",
+        index=False,
+        sep=";",
+        header=not existe_processos
+    )
 
     with open("leituras.csv", "rb") as data:
         bucket.put_object(Key="dados/leituras.csv", Body=data)
