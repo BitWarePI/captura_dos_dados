@@ -8,10 +8,17 @@ import random
 import boto3
 
 s3 = boto3.resource('s3')
-bucket = s3.Bucket('s3-raw-bitwarepi')
+bucket = s3.Bucket("s3-raw-bitwarepi")
 
-for bucket_item in s3.buckets.all():
-    print(bucket_item.name)
+try:
+    bucket.download_file("dados/leituras.csv", "leituras.csv")
+except:
+    open("leituras.csv", "w").close()
+
+try:
+    bucket.download_file("dados/processos.csv", "processos.csv")
+except:
+    open("processos.csv", "w").close()
 
 while True:
     datetime_atual = dt.datetime.now().replace(microsecond=0)
@@ -51,29 +58,23 @@ while True:
                 'datetime': datetime_atual,
                 'processo': processo.name(),
                 'uso_de_cpu': round(cpu_proc, 2),
-                'uso de gpu': round(gpu_percent, 2),
+                'uso_de_gpu': round(gpu_percent, 2),
                 'mac_address': mac
             })
-        except (ps.NoSuchProcess, ps.AccessDenied, ps.ZombieProcess):
-            continue        
+        except:
+            pass
 
     dfProcesso = pd.DataFrame(lista_processos)
 
-    if os.path.exists('processos.csv'):
-        dfProcesso.to_csv('processos.csv', mode='a', index=False, header=False)
-    else:
-        dfProcesso.to_csv('processos.csv', mode='a', index=False, header=True)
+    df.to_csv("leituras.csv", mode="a", index=False, sep=";", header=False)
 
-    if os.path.exists('leituras.csv'):
-        df.to_csv('leituras.csv', mode='a', index=False, sep=';', header=False)
-    else:
-        df.to_csv('leituras.csv', mode='a', index=False, sep=';')
+    dfProcesso.to_csv("processos.csv", mode="a", index=False, header=False)
 
-    with open('leituras.csv', 'rb') as data:
-        bucket.put_object(Key='dados/leituras.csv', Body=data)
+    with open("leituras.csv", "rb") as data:
+        bucket.put_object(Key="dados/leituras.csv", Body=data)
 
-    with open('processos.csv', 'rb') as data:
-        bucket.put_object(Key='dados/processos.csv', Body=data)
+    with open("processos.csv", "rb") as data:
+        bucket.put_object(Key="dados/processos.csv", Body=data)
 
     time.sleep(2)
-    #time.sleep(10800) #3 horas
+    # time.sleep(10800)
