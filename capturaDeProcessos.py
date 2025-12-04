@@ -157,6 +157,7 @@ while True:
                 cpu_proc = processo.cpu_percent(interval=None)
                 lista_processos.append({
                     'datetime': datetime_atual,
+                    'pid': processo.pid,                    
                     'processo': processo.name(),
                     'uso_de_cpu': round(cpu_proc, 2),
                     'uso_de_gpu': round(gpu_percent, 2),
