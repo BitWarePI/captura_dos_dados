@@ -7,14 +7,39 @@ from getmac import get_mac_address
 import random
 import boto3
 import platform
-import wmi
 import io
+import requests
+import subprocess
 
 print("--- Iniciando Bitware Monitor ---")
 
-# --- Variáveis Estáticas (Executam uma vez) ---
+def get_public_ip():
+    try:
+        ip = requests.get("https://api.ipify.org", timeout=3).text
+        if ip:
+            return ip
+    except:
+        pass
+
+    try:
+        result = subprocess.run(
+            ["curl", "-s", "https://api.ipify.org"],
+            capture_output=True,
+            text=True
+        )
+        ip = result.stdout.strip()
+        if ip:
+            return ip
+    except:
+        pass
+
+    return None
+
+
+# --- Variáveis Estáticas ---
 current_mac = get_mac_address()
 macs_existentes = set()
+ip_publico = get_public_ip()
 
 # Configuração S3
 try:
@@ -32,12 +57,10 @@ def baixar_ou_criar(nome_arquivo):
     global macs_existentes
     
     try:
-        # Tenta baixar o arquivo do S3
         with io.BytesIO() as data:
             bucket.download_fileobj(caminho_s3, data)
             data.seek(0)
             
-            # Se for o hardware.csv, lemos e checamos os MACs
             if nome_arquivo == "hardware.csv":
                 try:
                     df_hardware = pd.read_csv(data, sep=';', usecols=['macAddress'])
@@ -46,12 +69,10 @@ def baixar_ou_criar(nome_arquivo):
                 except Exception as read_error:
                     print(f"Aviso: Não foi possível ler MACs do hardware.csv. {read_error}")
 
-        # Salva o arquivo localmente para o loop usar
         bucket.download_file(caminho_s3, caminho_local)
         print(f"Arquivo {nome_arquivo} baixado do S3.")
 
     except Exception:
-        # Se falhar o download, criamos um arquivo vazio local
         if not os.path.exists(caminho_local):
             open(caminho_local, "w").close()
             print(f"Arquivo {nome_arquivo} criado localmente (vazio).")
@@ -63,48 +84,63 @@ baixar_ou_criar("leituras.csv")
 baixar_ou_criar("processos.csv")
 baixar_ou_criar("hardware.csv")
 
-# --- Função Hardware (Com proteção contra falhas) ---
+# --- Função Hardware ---
 def get_real_hardware_info():
-    print("Lendo informações de Hardware (WMI)...")
-    try:
-        c = wmi.WMI()
-        
-        # RAM
-        total_ram_bytes = sum(int(stick.Capacity) for stick in c.Win32_PhysicalMemory())
-        ram_gb = round(total_ram_bytes / (1024**3), 2)
+    print("Lendo informações de Hardware...")
 
-        # GPU
-        gpu_vram_gb = 0.0
-        for gpu in c.Win32_VideoController():
-            try:
-                vram_raw = int(gpu.AdapterRAM)
-                if vram_raw < 0: vram_raw = vram_raw & 0xFFFFFFFF
-                vram_calc = round(vram_raw / (1024**3), 2)
-                if vram_calc > gpu_vram_gb:
-                    gpu_vram_gb = vram_calc
-            except:
-                continue
-        
+    # --- WINDOWS ---
+    if platform.system() == "Windows":
+        try:
+            import wmi
+            c = wmi.WMI()
+
+            total_ram_bytes = sum(int(stick.Capacity) for stick in c.Win32_PhysicalMemory())
+            ram_gb = round(total_ram_bytes / (1024**3), 2)
+
+            gpu_vram_gb = 0.0
+            for gpu in c.Win32_VideoController():
+                try:
+                    vram_raw = int(gpu.AdapterRAM)
+                    if vram_raw < 0:
+                        vram_raw = vram_raw & 0xFFFFFFFF
+                    vram_calc = round(vram_raw / (1024**3), 2)
+                    gpu_vram_gb = max(gpu_vram_gb, vram_calc)
+                except:
+                    pass
+
+            return ram_gb, gpu_vram_gb
+
+        except Exception as e:
+            print(f"Erro ao ler via WMI ({e}). Usando padrão.")
+            return 8.0, 2.0
+
+    # --- LINUX ---
+    else:
+        print("Linux detectado → usando psutil para RAM e padrão para GPU.")
+
+        ram_gb = round(ps.virtual_memory().total / (1024**3), 2)
+
+        # GPU não tem API universal em Linux
+        gpu_vram_gb = 0.0  
+
         return ram_gb, gpu_vram_gb
-    except Exception as e:
-        print(f"ALERTA: Não foi possível ler hardware via WMI ({e}). Usando padrão.")
-        return 8.0, 2.0 # Valores padrão de fallback
 
-# Coleta estática (Executa uma vez)
 qtd_ram_gb, qtd_gpu_vram = get_real_hardware_info()
 os_version = platform.platform()
 cpu_cores = ps.cpu_count(logical=True)
 
-# --- NOVO: Capacidade do Disco ---
 try:
-    # Captura a capacidade total do disco principal (assumindo 'C:\' no Windows)
-    disk_capacity_bytes = ps.disk_usage('C:\\').total
+    if platform.system() == "Windows":
+        disk_capacity_bytes = ps.disk_usage('C:\\').total
+    else:
+        disk_capacity_bytes = ps.disk_usage('/').total
+
     disk_capacity_gb = round(disk_capacity_bytes / (1024**3), 2)
-except Exception as e:
-    print(f"ALERTA: Não foi possível ler a capacidade do disco (C:\\): {e}")
+except:
     disk_capacity_gb = 0.0
 
-print(f"Hardware detectado -> RAM: {qtd_ram_gb}GB | GPU: {qtd_gpu_vram}GB | DISCO: {disk_capacity_gb}GB | OS: {os_version}")
+
+print(f"Hardware detectado -> RAM: {qtd_ram_gb}GB | GPU: {qtd_gpu_vram}GB | DISCO: {disk_capacity_gb}GB | OS: {os_version} | IP: {ip_publico}")
 
 # --- Loop Principal ---
 while True:
@@ -113,20 +149,12 @@ while True:
         datetime_atual = dt.datetime.now().replace(microsecond=0)
         mac = current_mac 
         
-        # Métricas
         cpu_percent = ps.cpu_percent(interval=1)
+        temperatura_CPU = max(30, min(90, 30 + (cpu_percent * 0.6) + random.uniform(-2, 2)))
         
-        # Simulação de Temperatura
-        temperatura_CPU = 30 + (cpu_percent * 0.6) + random.uniform(-2, 2)
-        temperatura_CPU = max(30, min(90, temperatura_CPU))
-        
-        gpu_percent = cpu_percent + random.uniform(-15, 15)
-        gpu_percent = max(0, min(100, gpu_percent))
-        
-        temperatura_GPU = 35 + (gpu_percent * 0.55) + random.uniform(-3, 3)
-        temperatura_GPU = max(35, min(95, temperatura_GPU))
+        gpu_percent = max(0, min(100, cpu_percent + random.uniform(-15, 15)))
+        temperatura_GPU = max(35, min(95, 35 + (gpu_percent * 0.55) + random.uniform(-3, 3)))
 
-        # --- DataFrames ---
         dadosMaq = {
             "datetime": [datetime_atual],
             "cpu_percent": [round(cpu_percent, 2)],
@@ -137,7 +165,6 @@ while True:
         }
         df = pd.DataFrame(dadosMaq)
 
-        # O DataFrame de Hardware é criado, mas só será salvo se o MAC não existir
         dadosHardware = {
             "datetime": [datetime_atual],
             "macAddress": [mac],
@@ -145,7 +172,8 @@ while True:
             "qtdRam": [qtd_ram_gb],
             "cpuCor": [cpu_cores],
             "qtdGpu": [qtd_gpu_vram],
-            "qtdDisco": [disk_capacity_gb]
+            "qtdDisco": [disk_capacity_gb],
+            "ipPublico": [ip_publico]
         }
         dfHardware = pd.DataFrame(dadosHardware)
 
@@ -157,7 +185,7 @@ while True:
                 cpu_proc = processo.cpu_percent(interval=None)
                 lista_processos.append({
                     'datetime': datetime_atual,
-                    'pid': processo.pid,                    
+                    'pid': processo.pid,
                     'processo': processo.name(),
                     'uso_de_cpu': round(cpu_proc, 2),
                     'uso_de_gpu': round(gpu_percent, 2),
@@ -165,9 +193,9 @@ while True:
                 })
             except:
                 pass
+
         dfProcesso = pd.DataFrame(lista_processos)
 
-        # --- Salvamento e Upload (Com tratamento de erros) ---
         arquivos = [
             ("leituras.csv", df),
             ("processos.csv", dfProcesso),
@@ -175,16 +203,14 @@ while True:
         ]
 
         for nome_arquivo, dataframe in arquivos:
-            # Lógica de Registro Único para hardware.csv
+
             if nome_arquivo == "hardware.csv":
                 if mac in macs_existentes:
-                    print(f"INFO: MAC {mac} já registrado em hardware.csv. Pulando a escrita.")
+                    print(f"INFO: MAC {mac} já registrado. Pulando hardware.csv.")
                     continue
-                else:
-                    macs_existentes.add(mac)
-                    print(f"INFO: Adicionando novo MAC {mac} ao hardware.csv.")
+                macs_existentes.add(mac)
+                print(f"INFO: Registrando novo hardware para {mac}.")
 
-            # 1. Tenta salvar no Disco Local
             try:
                 existe = os.path.exists(nome_arquivo) and os.path.getsize(nome_arquivo) > 0
                 dataframe.to_csv(
@@ -194,26 +220,22 @@ while True:
                     sep=";",
                     header=not existe
                 )
-            except PermissionError:
-                print(f"ERRO: Feche o arquivo {nome_arquivo} no Excel para salvar!")
-                continue
             except Exception as e:
-                print(f"Erro ao salvar {nome_arquivo} localmente: {e}")
+                print(f"Erro ao salvar {nome_arquivo}: {e}")
                 continue
 
-            # 2. Tenta fazer Upload para S3
             try:
                 with open(nome_arquivo, "rb") as data:
                     bucket.put_object(Key=f"dados/{nome_arquivo}", Body=data)
             except Exception as e:
-                print(f"Erro de conexão S3 no arquivo {nome_arquivo}: {e}")
+                print(f"Erro de conexão S3 ao enviar {nome_arquivo}: {e}")
 
-        print(f"Dados salvos com sucesso em {datetime_atual}")
+        print(f"Dados salvos em {datetime_atual}\n")
         time.sleep(2)
 
     except KeyboardInterrupt:
         print("Parando execução...")
         break
     except Exception as e:
-        print(f"Erro fatal no loop principal: {e}")
+        print(f"Erro no loop principal: {e}")
         time.sleep(5)
